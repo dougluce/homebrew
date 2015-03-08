@@ -1,14 +1,12 @@
-require 'formula'
-
 class ZshCompletions < Formula
-  homepage 'https://github.com/zsh-users/zsh-completions'
-  url 'https://github.com/zsh-users/zsh-completions/archive/0.8.0.tar.gz'
-  sha1 'd1884c307775a1e0621be0fb7c443f1cf5f260b9'
+  homepage "https://github.com/zsh-users/zsh-completions"
+  url "https://github.com/zsh-users/zsh-completions/archive/0.12.0.tar.gz"
+  sha1 "1c39734328b28c619a55fa52fa42e81c314aeadf"
 
-  head 'https://github.com/zsh-users/zsh-completions.git'
+  head "https://github.com/zsh-users/zsh-completions.git"
 
   def install
-    (share/'zsh-completions').install Dir['src/_*']
+    (share/"zsh-completions").install Dir["src/_*"]
   end
 
   def caveats

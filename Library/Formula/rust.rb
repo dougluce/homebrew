@@ -2,25 +2,35 @@ require 'formula'
 
 class Rust < Formula
   homepage 'http://www.rust-lang.org/'
-  url 'http://static.rust-lang.org/dist/rust-0.6.tar.gz'
-  sha256 'e11cb529a1e20f27d99033181a9e0e131817136b46d2742f0fa1afa1210053e5'
+  url 'https://static.rust-lang.org/dist/rustc-1.0.0-alpha.2-src.tar.gz'
+  version "1.0.0-alpha.2"
+  sha256 'a931b945e98f409df68fdff23e98b688024461c28901106896e73708381956c8'
 
-  fails_with :clang do
-    build 318
-    cause "cannot initialize a parameter of type 'volatile long long *' with an rvalue of type 'int *'"
+  head 'https://github.com/rust-lang/rust.git'
+
+  bottle do
+    sha1 "c1a024f85c9af99d140762de3c87738b00ead44e" => :yosemite
+    sha1 "325c8021a0c911e39eb536879698aa5e21e2ab05" => :mavericks
+    sha1 "e0bbe731065a341f65722ed2e6f9e3861d8bb702" => :mountain_lion
   end
 
   def install
     args = ["--prefix=#{prefix}"]
+    args << "--disable-rpath" if build.head?
     args << "--enable-clang" if ENV.compiler == :clang
     system "./configure", *args
     system "make"
     system "make install"
   end
 
-  def test
-    system "#{bin}/rustc"
-    system "#{bin}/rustdoc"
-    system "#{bin}/cargo"
+  test do
+    system "#{bin}/rustdoc", "-h"
+    (testpath/"hello.rs").write <<-EOS.undent
+    fn main() {
+      println!("Hello World!");
+    }
+    EOS
+    system "#{bin}/rustc", "hello.rs"
+    assert_equal "Hello World!\n", `./hello`
   end
 end

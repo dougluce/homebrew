@@ -1,18 +1,22 @@
-require 'formula'
-
 class Ctags < Formula
-  homepage 'http://ctags.sourceforge.net/'
-  url 'http://downloads.sourceforge.net/ctags/ctags-5.8.tar.gz'
-  sha1 '482da1ecd182ab39bbdc09f2f02c9fba8cd20030'
+  homepage "http://ctags.sourceforge.net/"
+  url "https://downloads.sourceforge.net/ctags/ctags-5.8.tar.gz"
+  sha1 "482da1ecd182ab39bbdc09f2f02c9fba8cd20030"
 
-  head 'https://ctags.svn.sourceforge.net/svnroot/ctags/trunk'
-
-  depends_on :autoconf if build.head?
-
-  def patches
-    # fixes http://sourceforge.net/tracker/?func=detail&aid=3247256&group_id=6556&atid=106556
-    { :p2 => "https://raw.github.com/gist/4010022/8d0697dc87a40e65011e2192439609c17578c5be/ctags.patch" }
+  bottle do
+    cellar :any
+    sha1 "7da87475dee54acc46b0a38afc52122d9cbe6188" => :yosemite
+    sha1 "afc599e7097afd5eb185925dc81f8e9e437b5be8" => :mavericks
+    sha1 "cee93b102782dde467bb091589dd4315c19dfd0c" => :mountain_lion
   end
+
+  head do
+    url "https://svn.code.sf.net/p/ctags/code/trunk"
+    depends_on "autoconf" => :build
+  end
+
+  # fixes http://sourceforge.net/tracker/?func=detail&aid=3247256&group_id=6556&atid=106556
+  patch :p2, :DATA
 
   def install
     if build.head?
@@ -23,7 +27,7 @@ class Ctags < Formula
                           "--enable-macro-patterns",
                           "--mandir=#{man}",
                           "--with-readlib"
-    system "make install"
+    system "make", "install"
   end
 
   def caveats
@@ -39,4 +43,62 @@ class Ctags < Formula
       link.
     EOS
   end
+
+  test do
+    (testpath/"test.c").write <<-EOS.undent
+      #include <stdio.h>
+      #include <stdlib.h>
+
+      void func()
+      {
+        printf("Hello World!");
+      }
+
+      int main()
+      {
+        func();
+        return 0;
+      }
+    EOS
+    system "#{bin}/ctags", "-R", "."
+    assert_match /func.*test\.c/, File.read("tags")
+  end
 end
+
+__END__
+diff -ur a/ctags-5.8/read.c b/ctags-5.8/read.c
+--- a/ctags-5.8/read.c	2009-07-04 17:29:02.000000000 +1200
++++ b/ctags-5.8/read.c	2012-11-04 16:19:27.000000000 +1300
+@@ -18,7 +18,6 @@
+ #include <string.h>
+ #include <ctype.h>
+ 
+-#define FILE_WRITE
+ #include "read.h"
+ #include "debug.h"
+ #include "entry.h"
+diff -ur a/ctags-5.8/read.h b/ctags-5.8/read.h
+--- a/ctags-5.8/read.h	2008-04-30 13:45:57.000000000 +1200
++++ b/ctags-5.8/read.h	2012-11-04 16:19:18.000000000 +1300
+@@ -11,12 +11,6 @@
+ #ifndef _READ_H
+ #define _READ_H
+ 
+-#if defined(FILE_WRITE) || defined(VAXC)
+-# define CONST_FILE
+-#else
+-# define CONST_FILE const
+-#endif
+-
+ /*
+ *   INCLUDE FILES
+ */
+@@ -95,7 +89,7 @@
+ /*
+ *   GLOBAL VARIABLES
+ */
+-extern CONST_FILE inputFile File;
++extern inputFile File;
+ 
+ /*
+ *   FUNCTION PROTOTYPES

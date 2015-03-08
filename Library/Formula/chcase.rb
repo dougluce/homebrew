@@ -1,14 +1,18 @@
-require 'formula'
+class Chcase < Formula
+  homepage "http://www.primaledge.ca/chcase.html"
+  url "http://www.primaledge.ca/chcase"
+  version "2.0"
+  sha1 "ec81ad76d85cf9162d422e801092ddc5e0841e39"
 
-class Chcase < ScriptFileFormula
-  url 'http://www.primaledge.ca/chcase'
-  version '2.0'
-  sha1 'ec81ad76d85cf9162d422e801092ddc5e0841e39'
-  homepage 'http://www.primaledge.ca/chcase.html'
+  # add a shebang so that brew properly sets it executable
+  patch :DATA
 
-  def patches
-    # add a shebang so that brew properly sets it executable
-    DATA
+  def install
+    bin.install "chcase"
+  end
+
+  test do
+    system bin/"chcase", "-e"
   end
 end
 

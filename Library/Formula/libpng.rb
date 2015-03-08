@@ -1,24 +1,42 @@
-require 'formula'
-
 class Libpng < Formula
-  homepage 'http://www.libpng.org/pub/png/libpng.html'
-  url 'http://downloads.sf.net/project/libpng/libpng15/1.5.14/libpng-1.5.14.tar.gz'
-  sha1 '67f20d69564a4a50204cb924deab029f11ad2d3c'
+  homepage "http://www.libpng.org/pub/png/libpng.html"
+  url "https://downloads.sf.net/project/libpng/libpng16/1.6.16/libpng-1.6.16.tar.xz"
+  sha1 "31855a8438ae795d249574b0da15b34eb0922e13"
+
+  bottle do
+    cellar :any
+    sha1 "f7b47fcf9d4111075745b04b6fbdb63062982bca" => :yosemite
+    sha1 "b67793bae0a5d109be5ad19d27bbeb4509f4ecee" => :mavericks
+    sha1 "a2fb283d2f96161ecee5d504adb92b26376b7d9e" => :mountain_lion
+  end
 
   keg_only :provided_pre_mountain_lion
 
   option :universal
 
-  bottle do
-    sha1 '5e7feb640d654df0c2ac072d86e46ce9df9eaeee' => :mountain_lion
-    sha1 'bbd94d671653943cf21314911978d90f5fb536df' => :lion
-    sha1 'fb685cfb8b37b883bf004ee7c9ca785d3435b155' => :snow_leopard
-  end
-
   def install
     ENV.universal_binary if build.universal?
     system "./configure", "--disable-dependency-tracking",
+                          "--disable-silent-rules",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make"
+    system "make", "test"
+    system "make", "install"
+  end
+
+  test do
+    (testpath/"test.c").write <<-EOS.undent
+      #include <png.h>
+
+      int main()
+      {
+        png_structp png_ptr;
+        png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+        png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
+        return 0;
+      }
+    EOS
+    system ENV.cc, "test.c", "-I#{include}", "-L#{lib}", "-lpng", "-o", "test"
+    system "./test"
   end
 end

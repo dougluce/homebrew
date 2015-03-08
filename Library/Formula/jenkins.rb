@@ -1,22 +1,27 @@
-require 'formula'
-
 class Jenkins < Formula
-  homepage 'http://jenkins-ci.org'
-  url 'http://mirrors.jenkins-ci.org/war/1.512/jenkins.war'
-  sha1 '1527cd71989ee65a8172ab6c8691714b65d3e9f7'
+  homepage "https://jenkins-ci.org"
+  url "http://mirrors.jenkins-ci.org/war/1.601/jenkins.war"
+  sha1 "ba8094168f08620435b0f57b360a8422641d37b1"
 
-  head 'https://github.com/jenkinsci/jenkins.git'
+  head do
+    url "https://github.com/jenkinsci/jenkins.git"
+    depends_on "maven" => :build
+  end
+
+  depends_on :java => "1.6+"
 
   def install
     if build.head?
-      system "mvn clean install -pl war -am -DskipTests"
-      libexec.install 'war/target/jenkins.war', '.'
+      system "mvn", "clean", "install", "-pl", "war", "-am", "-DskipTests"
     else
-      libexec.install "jenkins.war"
+      system "jar", "xvf", "jenkins.war"
     end
+    libexec.install Dir["**/jenkins.war", "**/jenkins-cli.jar"]
+    bin.write_jar_script libexec/"jenkins.war", "jenkins"
+    bin.write_jar_script libexec/"jenkins-cli.jar", "jenkins-cli"
   end
 
-  plist_options :manual => "java -jar #{HOMEBREW_PREFIX}/opt/jenkins/libexec/jenkins.war"
+  plist_options :manual => "jenkins"
 
   def plist; <<-EOS.undent
     <?xml version="1.0" encoding="UTF-8"?>
@@ -28,14 +33,21 @@ class Jenkins < Formula
         <key>ProgramArguments</key>
         <array>
           <string>/usr/bin/java</string>
+          <string>-Dmail.smtp.starttls.enable=true</string>
           <string>-jar</string>
-          <string>#{opt_prefix}/libexec/jenkins.war</string>
+          <string>#{opt_libexec}/jenkins.war</string>
           <string>--httpListenAddress=127.0.0.1</string>
+          <string>--httpPort=8080</string>
         </array>
         <key>RunAtLoad</key>
         <true/>
       </dict>
     </plist>
   EOS
+  end
+
+  def caveats; <<-EOS.undent
+    Note: When using launchctl the port will be 8080.
+    EOS
   end
 end

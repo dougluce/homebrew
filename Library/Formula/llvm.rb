@@ -1,63 +1,121 @@
-require 'formula'
-
-class Clang < Formula
-  homepage  'http://llvm.org/'
-  url       'http://llvm.org/releases/3.2/clang-3.2.src.tar.gz'
-  sha1      'b0515298c4088aa294edc08806bd671f8819f870'
-
-  head      'http://llvm.org/git/clang.git'
-end
-
-class CompilerRt < Formula
-  homepage  'http://llvm.org/'
-  url       'http://llvm.org/releases/3.2/compiler-rt-3.2.src.tar.gz'
-  sha1      '718c0249a00e928f8bba32c84771da998ea4d42f'
-
-  head      'http://llvm.org/git/compiler-rt.git'
-end
-
 class Llvm < Formula
-  homepage  'http://llvm.org/'
-  url       'http://llvm.org/releases/3.2/llvm-3.2.src.tar.gz'
-  sha1      '42d139ab4c9f0c539c60f5ac07486e9d30fc1280'
+  homepage "http://llvm.org/"
 
-  head      'http://llvm.org/git/llvm.git'
+  stable do
+    url "http://llvm.org/releases/3.5.1/llvm-3.5.1.src.tar.xz"
+    sha1 "79638cf00584b08fd6eeb1e73ea69b331561e7f6"
 
-  bottle do
-    revision 1
-    sha1 '2908621be867da84962d2e4b8d6a083bd6bf4995' => :mountain_lion
-    sha1 '91dfa26392b9699750a04fa934ee8ec9dc98407a' => :lion
-    sha1 '259f39608d50dd3aba0eb3ff28b603d795af9eac' => :snow_leopard
+    resource "clang" do
+      url "http://llvm.org/releases/3.5.1/cfe-3.5.1.src.tar.xz"
+      sha1 "39d79c0b40cec548a602dcac3adfc594b18149fe"
+    end
+
+    resource "libcxx" do
+      url "http://llvm.org/releases/3.5.1/libcxx-3.5.1.src.tar.xz"
+      sha1 "aa8d221f4db99f5a8faef6b594cbf7742cc55ad2"
+    end
+
+    resource "lld" do
+      url "http://llvm.org/releases/3.5.1/lld-3.5.1.src.tar.xz"
+      sha1 "9af270a79ae0aeb0628112073167495c43ab836a"
+    end
+
+    resource "lldb" do
+      url "http://llvm.org/releases/3.5.1/lldb-3.5.1.src.tar.xz"
+      sha1 "32728e25e6e513528c8c793ae65981150bec7c0d"
+    end
+
+    resource "clang-tools-extra" do
+      url "http://llvm.org/releases/3.5.1/clang-tools-extra-3.5.1.src.tar.xz"
+      sha1 "7a0dd880d7d8fe48bdf0f841eca318337d27a345"
+    end
   end
 
+  bottle do
+    sha1 "3e2dd43db3c45a3bcf96174e0b195267f66f0307" => :yosemite
+    sha1 "e0314fabbc5791fb665225ca91602b3fdd745072" => :mavericks
+    sha1 "59857e2f5670c9edb4adfd3cc3f03af2411e9c30" => :mountain_lion
+  end
+
+  head do
+    url "http://llvm.org/git/llvm.git"
+
+    resource "clang" do
+      url "http://llvm.org/git/clang.git"
+    end
+
+    resource "libcxx" do
+      url "http://llvm.org/git/libcxx.git"
+    end
+
+    resource "lld" do
+      url "http://llvm.org/git/lld.git"
+    end
+
+    resource "lldb" do
+      url "http://llvm.org/git/lldb.git"
+    end
+
+    resource "clang-tools-extra" do
+      url "http://llvm.org/git/clang-tools-extra.git"
+    end
+  end
+
+  # Use absolute paths for shared library IDs
+  patch :DATA
+
   option :universal
-  option 'with-clang', 'Build Clang C/ObjC/C++ frontend'
-  option 'with-asan', 'Include support for -faddress-sanitizer (from compiler-rt)'
-  option 'shared', 'Build LLVM as a shared library'
-  option 'all-targets', 'Build all target backends'
-  option 'rtti', 'Build with C++ RTTI'
-  option 'disable-assertions', 'Speeds up LLVM, but provides less debug information'
+  option "with-clang", "Build Clang support library"
+  option "with-lld", "Build LLD linker"
+  option "with-lldb", "Build LLDB debugger"
+  option "with-rtti", "Build with C++ RTTI"
+  option "with-all-targets", "Build all target backends"
+  option "with-python", "Build Python bindings against Homebrew Python"
+  option "without-shared", "Don't build LLVM as a shared library"
+  option "without-assertions", "Speeds up LLVM, but provides less debug information"
+
+  deprecated_option "rtti" => "with-rtti"
+  deprecated_option "all-targets" => "with-all-targets"
+  deprecated_option "disable-shared" => "without-shared"
+  deprecated_option "disable-assertions" => "without-assertions"
+
+  if MacOS.version <= :snow_leopard
+    depends_on :python
+  else
+    depends_on :python => :optional
+  end
+  depends_on "swig" if build.with? "lldb"
+
+  keg_only :provided_by_osx
+
+  # Apple's libstdc++ is too old to build LLVM
+  fails_with :gcc
+  fails_with :llvm
 
   def install
-    if build.universal? and build.include? 'shared'
-      onoe "Cannot specify both shared and universal (will not build)"
-      exit 1
+    # Apple's libstdc++ is too old to build LLVM
+    ENV.libcxx if ENV.compiler == :clang
+
+    if build.with?("lldb") && build.without?("clang")
+      fail "Building LLDB needs Clang support library."
     end
 
-    Clang.new("clang").brew do
-      clang_dir.install Dir['*']
-    end if build.include? 'with-clang'
+    if build.with? "clang"
+      (buildpath/"projects/libcxx").install resource("libcxx")
+      (buildpath/"tools/clang").install resource("clang")
+      (buildpath/"tools/clang/tools/extra").install resource("clang-tools-extra")
+    end
 
-    CompilerRt.new("compiler-rt").brew do
-      (buildpath/'projects/compiler-rt').install Dir['*']
-    end if build.include? 'with-asan'
+    (buildpath/"tools/lld").install resource("lld") if build.with? "lld"
+    (buildpath/"tools/lldb").install resource("lldb") if build.with? "lldb"
 
     if build.universal?
-      ENV['UNIVERSAL'] = '1'
-      ENV['UNIVERSAL_ARCH'] = 'i386 x86_64'
+      ENV.permit_arch_flags
+      ENV["UNIVERSAL"] = "1"
+      ENV["UNIVERSAL_ARCH"] = Hardware::CPU.universal_archs.join(" ")
     end
 
-    ENV['REQUIRES_RTTI'] = '1' if build.include? 'rtti'
+    ENV["REQUIRES_RTTI"] = "1" if build.with?("rtti") || build.with?("clang")
 
     args = [
       "--prefix=#{prefix}",
@@ -67,43 +125,62 @@ class Llvm < Formula
       "--disable-bindings",
     ]
 
-    if build.include? 'all-targets'
+    if build.with? "all-targets"
       args << "--enable-targets=all"
     else
       args << "--enable-targets=host"
     end
-    args << "--enable-shared" if build.include? 'shared'
+    args << "--enable-shared" if build.with? "shared"
 
-    args << "--disable-assertions" if build.include? 'disable-assertions'
+    args << "--disable-assertions" if build.without? "assertions"
 
     system "./configure", *args
-    system "make install"
+    system "make"
+    system "make", "install"
+
+    if build.with? "clang"
+      system "make", "-C", "projects/libcxx", "install",
+        "DSTROOT=#{prefix}", "SYMROOT=#{buildpath}/projects/libcxx"
+
+      (share/"clang/tools").install Dir["tools/clang/tools/scan-{build,view}"]
+      inreplace "#{share}/clang/tools/scan-build/scan-build", "$RealBin/bin/clang", "#{bin}/clang"
+      bin.install_symlink share/"clang/tools/scan-build/scan-build", share/"clang/tools/scan-view/scan-view"
+      man1.install_symlink share/"clang/tools/scan-build/scan-build.1"
+    end
 
     # install llvm python bindings
-    (share/'llvm/bindings').install buildpath/'bindings/python'
-
-    # install clang tools and bindings
-    cd clang_dir do
-      system 'make install'
-      (share/'clang/tools').install 'tools/scan-build', 'tools/scan-view'
-      (share/'clang/bindings').install 'bindings/python'
-    end if build.include? 'with-clang'
+    (lib+"python2.7/site-packages").install buildpath/"bindings/python/llvm"
+    (lib+"python2.7/site-packages").install buildpath/"tools/clang/bindings/python/clang" if build.with? "clang"
   end
 
-  def test
+  test do
     system "#{bin}/llvm-config", "--version"
   end
 
-  def caveats; <<-EOS.undent
-    Extra tools and bindings are installed in #{share}/llvm and #{share}/clang.
-
-    If you already have LLVM installed, then "brew upgrade llvm" might not work.
-    Instead, try:
-        brew rm llvm && brew install llvm
+  def caveats
+    <<-EOS.undent
+      LLVM executables are installed in #{opt_bin}.
+      Extra tools are installed in #{opt_share}/llvm.
     EOS
   end
-
-  def clang_dir
-    buildpath/'tools/clang'
-  end
 end
+
+__END__
+diff --git a/Makefile.rules b/Makefile.rules
+index ebebc0a..b0bb378 100644
+--- a/Makefile.rules
++++ b/Makefile.rules
+@@ -599,7 +599,12 @@ ifneq ($(HOST_OS), $(filter $(HOST_OS), Cygwin MingW))
+ ifneq ($(HOST_OS),Darwin)
+   LD.Flags += $(RPATH) -Wl,'$$ORIGIN'
+ else
+-  LD.Flags += -Wl,-install_name  -Wl,"@rpath/lib$(LIBRARYNAME)$(SHLIBEXT)"
++  LD.Flags += -Wl,-install_name
++  ifdef LOADABLE_MODULE
++    LD.Flags += -Wl,"$(PROJ_libdir)/$(LIBRARYNAME)$(SHLIBEXT)"
++  else
++    LD.Flags += -Wl,"$(PROJ_libdir)/$(SharedPrefix)$(LIBRARYNAME)$(SHLIBEXT)"
++  endif
+ endif
+ endif
+ endif

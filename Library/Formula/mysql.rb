@@ -1,114 +1,133 @@
-require 'formula'
-
 class Mysql < Formula
-  homepage 'http://dev.mysql.com/doc/refman/5.6/en/'
-  url 'http://dev.mysql.com/get/Downloads/MySQL-5.6/mysql-5.6.10.tar.gz/from/http://cdn.mysql.com/'
-  version '5.6.10'
-  sha1 'f37979eafc241a0ebeac9548cb3f4113074271b7'
+  homepage "https://dev.mysql.com/doc/refman/5.6/en/"
+  url "https://cdn.mysql.com/Downloads/MySQL-5.6/mysql-5.6.23.tar.gz"
+  sha1 "2d610ba01ab97df042d5946ba0da411da5547c5d"
 
   bottle do
-    sha1 'e07b9a207364b6e020fc96f49116b58d33d0eb78' => :mountain_lion
-    sha1 'b9b38e2ed705a3fcd79bb549f32e49b455f31917' => :lion
-    sha1 '30978684ee72c4dfb0b20263331b0c93972b3092' => :snow_leopard
+    sha1 "9edc48cf27c50b6f51bfd90af86716a4a36b39e8" => :yosemite
+    sha1 "e4aee77fd9a4882bd85a718b622fbd817d87e4ae" => :mavericks
+    sha1 "38ef7c81c209fd7ca55f3769c32c9ae593f4384d" => :mountain_lion
   end
 
-  depends_on 'cmake' => :build
-  depends_on 'pidof' unless MacOS.version >= :mountain_lion
+  # Fixes compilation with OpenSSL 1.0.2
+  # https://bugs.mysql.com/bug.php?id=75623
+  patch do
+    url "https://github.com/mysql/mysql-server/pull/3.diff"
+    sha1 "6b17a31ee32e373dca0f257f7c7884ac6dcf8e1f"
+  end
 
   option :universal
-  option 'with-tests', 'Build with unit tests'
-  option 'with-embedded', 'Build the embedded server'
-  option 'with-libedit', 'Compile with editline wrapper instead of readline'
-  option 'with-archive-storage-engine', 'Compile with the ARCHIVE storage engine enabled'
-  option 'with-blackhole-storage-engine', 'Compile with the BLACKHOLE storage engine enabled'
-  option 'enable-local-infile', 'Build with local infile loading support'
-  option 'enable-memcached', 'Enable innodb-memcached support'
-  option 'enable-debug', 'Build with debug support'
+  option "with-tests", "Build with unit tests"
+  option "with-embedded", "Build the embedded server"
+  option "with-archive-storage-engine", "Compile with the ARCHIVE storage engine enabled"
+  option "with-blackhole-storage-engine", "Compile with the BLACKHOLE storage engine enabled"
+  option "with-local-infile", "Build with local infile loading support"
+  option "with-memcached", "Enable innodb-memcached support"
+  option "with-debug", "Build with debug support"
 
-  conflicts_with 'mariadb',
-    :because => "mysql and mariadb install the same binaries."
+  deprecated_option "enable-local-infile" => "with-local-infile"
+  deprecated_option "enable-memcached" => "with-memcached"
+  deprecated_option "enable-debug" => "with-debug"
 
-  conflicts_with 'percona-server',
-    :because => "mysql and percona-server install the same binaries."
+  depends_on "cmake" => :build
+  depends_on "pidof" unless MacOS.version >= :mountain_lion
+  depends_on "openssl"
 
-  conflicts_with 'mysql-cluster',
-    :because => "mysql and mysql-cluster install the same binaries."
-
-  env :std if build.universal?
+  conflicts_with "mysql-cluster", "mariadb", "percona-server",
+    :because => "mysql, mariadb, and percona install the same binaries."
+  conflicts_with "mysql-connector-c",
+    :because => "both install MySQL client libraries"
 
   fails_with :llvm do
     build 2326
-    cause "https://github.com/mxcl/homebrew/issues/issue/144"
+    cause "https://github.com/Homebrew/homebrew/issues/issue/144"
   end
 
   def install
+    # Don't hard-code the libtool path. See:
+    # https://github.com/Homebrew/homebrew/issues/20185
+    inreplace "cmake/libutils.cmake",
+      "COMMAND /usr/bin/libtool -static -o ${TARGET_LOCATION}",
+      "COMMAND libtool -static -o ${TARGET_LOCATION}"
+
     # Build without compiler or CPU specific optimization flags to facilitate
     # compilation of gems and other software that queries `mysql-config`.
     ENV.minimal_optimization
 
-    args = [".",
-            "-DCMAKE_INSTALL_PREFIX=#{prefix}",
-            "-DMYSQL_DATADIR=#{var}/mysql",
-            "-DINSTALL_MANDIR=#{man}",
-            "-DINSTALL_DOCDIR=#{doc}",
-            "-DINSTALL_INFODIR=#{info}",
-            # CMake prepends prefix, so use share.basename
-            "-DINSTALL_MYSQLSHAREDIR=#{share.basename}/#{name}",
-            "-DWITH_SSL=yes",
-            "-DDEFAULT_CHARSET=utf8",
-            "-DDEFAULT_COLLATION=utf8_general_ci",
-            "-DSYSCONFDIR=#{etc}"]
+    # -DINSTALL_* are relative to prefix
+    args = %W[
+      .
+      -DCMAKE_INSTALL_PREFIX=#{prefix}
+      -DCMAKE_FIND_FRAMEWORK=LAST
+      -DCMAKE_VERBOSE_MAKEFILE=ON
+      -DMYSQL_DATADIR=#{var}/mysql
+      -DINSTALL_INCLUDEDIR=include/mysql
+      -DINSTALL_MANDIR=share/man
+      -DINSTALL_DOCDIR=share/doc/#{name}
+      -DINSTALL_INFODIR=share/info
+      -DINSTALL_MYSQLSHAREDIR=share/mysql
+      -DWITH_SSL=yes
+      -DWITH_SSL=system
+      -DDEFAULT_CHARSET=utf8
+      -DDEFAULT_COLLATION=utf8_general_ci
+      -DSYSCONFDIR=#{etc}
+      -DCOMPILATION_COMMENT=Homebrew
+      -DWITH_EDITLINE=system
+    ]
 
     # To enable unit testing at build, we need to download the unit testing suite
-    if build.include? 'with-tests'
+    if build.with? "tests"
       args << "-DENABLE_DOWNLOADS=ON"
     else
       args << "-DWITH_UNIT_TESTS=OFF"
     end
 
     # Build the embedded server
-    args << "-DWITH_EMBEDDED_SERVER=ON" if build.include? 'with-embedded'
-
-    # Compile with readline unless libedit is explicitly chosen
-    args << "-DWITH_READLINE=yes" unless build.include? 'with-libedit'
+    args << "-DWITH_EMBEDDED_SERVER=ON" if build.with? "embedded"
 
     # Compile with ARCHIVE engine enabled if chosen
-    args << "-DWITH_ARCHIVE_STORAGE_ENGINE=1" if build.include? 'with-archive-storage-engine'
+    args << "-DWITH_ARCHIVE_STORAGE_ENGINE=1" if build.with? "archive-storage-engine"
 
     # Compile with BLACKHOLE engine enabled if chosen
-    args << "-DWITH_BLACKHOLE_STORAGE_ENGINE=1" if build.include? 'with-blackhole-storage-engine'
+    args << "-DWITH_BLACKHOLE_STORAGE_ENGINE=1" if build.with? "blackhole-storage-engine"
 
     # Make universal for binding to universal applications
-    args << "-DCMAKE_OSX_ARCHITECTURES='i386;x86_64'" if build.universal?
+    if build.universal?
+      ENV.universal_binary
+      args << "-DCMAKE_OSX_ARCHITECTURES=#{Hardware::CPU.universal_archs.as_cmake_arch_flags}"
+    end
 
     # Build with local infile loading support
-    args << "-DENABLED_LOCAL_INFILE=1" if build.include? 'enable-local-infile'
+    args << "-DENABLED_LOCAL_INFILE=1" if build.with? "local-infile"
 
     # Build with memcached support
-    args << "-DWITH_INNODB_MEMCACHED=1" if build.include? 'enable-memcached'
+    args << "-DWITH_INNODB_MEMCACHED=1" if build.with? "memcached"
 
     # Build with debug support
-    args << "-DWITH_DEBUG=1" if build.include? 'enable-debug'
+    args << "-DWITH_DEBUG=1" if build.with? "debug"
 
     system "cmake", *args
     system "make"
-    system "make install"
+    system "make", "install"
 
     # Don't create databases inside of the prefix!
-    # See: https://github.com/mxcl/homebrew/issues/4975
-    rm_rf prefix+'data'
+    # See: https://github.com/Homebrew/homebrew/issues/4975
+    rm_rf prefix+"data"
 
     # Link the setup script into bin
-    ln_s prefix+'scripts/mysql_install_db', bin+'mysql_install_db'
+    bin.install_symlink prefix/"scripts/mysql_install_db"
+
     # Fix up the control script and link into bin
     inreplace "#{prefix}/support-files/mysql.server" do |s|
       s.gsub!(/^(PATH=".*)(")/, "\\1:#{HOMEBREW_PREFIX}/bin\\2")
       # pidof can be replaced with pgrep from proctools on Mountain Lion
-      s.gsub!(/pidof/, 'pgrep') if MacOS.version >= :mountain_lion
+      s.gsub!(/pidof/, "pgrep") if MacOS.version >= :mountain_lion
     end
-    ln_s "#{prefix}/support-files/mysql.server", bin
+
+    bin.install_symlink prefix/"support-files/mysql.server"
 
     # Move mysqlaccess to libexec
+    libexec.mkpath
     mv "#{bin}/mysqlaccess", libexec
     mv "#{bin}/mysqlaccess.conf", libexec
   end
@@ -116,10 +135,9 @@ class Mysql < Formula
   def post_install
     # Make sure the var/mysql directory exists
     (var+"mysql").mkpath
-
     unless File.exist? "#{var}/mysql/mysql/user.frm"
-      ENV['TMPDIR'] = nil
-      system "#{bin}/mysql_install_db", '--verbose', "--user=#{ENV['USER']}",
+      ENV["TMPDIR"] = nil
+      system "#{bin}/mysql_install_db", "--verbose", "--user=#{ENV["USER"]}",
         "--basedir=#{prefix}", "--datadir=#{var}/mysql", "--tmpdir=/tmp"
     end
   end
@@ -144,8 +162,12 @@ class Mysql < Formula
       <true/>
       <key>Label</key>
       <string>#{plist_name}</string>
-      <key>Program</key>
-      <string>#{opt_prefix}/bin/mysqld_safe</string>
+      <key>ProgramArguments</key>
+      <array>
+        <string>#{opt_bin}/mysqld_safe</string>
+        <string>--bind-address=127.0.0.1</string>
+        <string>--datadir=#{var}/mysql</string>
+      </array>
       <key>RunAtLoad</key>
       <true/>
       <key>WorkingDirectory</key>
@@ -156,8 +178,9 @@ class Mysql < Formula
   end
 
   test do
-    (prefix+'mysql-test').cd do
-      system './mysql-test-run.pl', 'status'
+    (prefix+"mysql-test").cd do
+      system "./mysql-test-run.pl", "status"
     end
   end
 end
+

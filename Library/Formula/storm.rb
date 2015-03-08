@@ -1,17 +1,10 @@
-require 'formula'
-
 class Storm < Formula
-  homepage 'https://github.com/nathanmarz/storm/wiki'
-  url 'https://dl.dropbox.com/u/133901206/storm-0.8.2.zip'
-  sha1 'abb533c90f5b9eeaafb9136670091fc894fce169'
-
-  devel do
-    url 'https://dl.dropbox.com/u/133901206/storm-0.9.0-wip13.zip'
-    sha1 '1de407b2eef494db3efc7f0d9b3f6e6fe2e28fc2'
-  end
+  homepage "http://storm.apache.org"
+  url "http://www.apache.org/dyn/closer.cgi?path=storm/apache-storm-0.9.3/apache-storm-0.9.3.tar.gz"
+  sha1 "33545afc72281d6e8b497fcbdf2b9944eebb83aa"
 
   def install
-    libexec.install Dir['*']
+    libexec.install Dir["*"]
     bin.install_symlink libexec/"bin/storm"
   end
 end

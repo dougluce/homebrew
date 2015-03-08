@@ -1,18 +1,17 @@
-require 'formula'
+require "formula"
 
 class GoAppEngine32 < Formula
-  homepage 'http://code.google.com/appengine/docs/go/overview.html'
-  url 'http://googleappengine.googlecode.com/files/go_appengine_sdk_darwin_386-1.7.7.zip'
-  sha1 '16abd21aa4df3c95c20dfa6b67ae586dd46c077e'
+  homepage "https://cloud.google.com/appengine/docs/go/"
+  url "https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_darwin_386-1.9.18.zip"
+  sha1 "5f74eba1b77dddca9122ba355e6348e8cc833031"
 
   def install
-    cd '..'
-    share.install 'google_appengine' => name
-    bin.mkpath
+    cd ".."
+    share.install "go_appengine" => name
     %w[
-      api_server.py appcfg.py bulkloader.py bulkload_client.py dev_appserver.py download_appstats.py
+      api_server.py appcfg.py bulkloader.py bulkload_client.py dev_appserver.py download_appstats.py goapp
     ].each do |fn|
-      ln_s share+name+fn, bin
+      bin.install_symlink share/name/fn
     end
   end
 end

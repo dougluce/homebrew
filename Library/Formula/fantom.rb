@@ -1,42 +1,31 @@
-require 'formula'
-
 class Fantom < Formula
-  homepage 'http://fantom.org'
-  url 'http://fan.googlecode.com/files/fantom-1.0.64.zip'
-  sha1 'bc5c364fc943350c4b04d402ef0c2554681f3950'
+  homepage "http://fantom.org"
+  url "https://bitbucket.org/fantom/fan-1.0/downloads/fantom-1.0.67.zip"
+  sha1 "36e45cc713c14b56df2bdbb19a8ccee98420ad1e"
 
-  option 'with-src', 'Also install fantom source'
-  option 'with-examples', 'Also install fantom examples'
-
-  # Select the OS X JDK path in the config file
-  def patches; DATA; end
+  option "with-src", "Also install fantom source"
+  option "with-examples", "Also install fantom examples"
 
   def install
-    rm_f Dir["bin/*.exe", "lib/dotnet/*"]
-    rm_rf "examples" unless build.include? 'with-examples'
-    rm_rf "src" unless build.include? 'with-src'
+    rm_f Dir["bin/*.exe", "bin/*.dll", "lib/dotnet/*"]
+    rm_rf "examples" if build.without? "examples"
+    rm_rf "src" if build.without? "src"
 
-    libexec.install Dir['*']
-    system "chmod 0755 #{libexec}/bin/*"
+    # Select the OS X JDK path in the config file
+    inreplace "etc/build/config.props", "//jdkHome=/System", "jdkHome=/System"
+
+    libexec.install Dir["*"]
+    chmod 0755, Dir["#{libexec}/bin/*"]
     bin.install_symlink Dir["#{libexec}/bin/*"]
   end
-end
 
-__END__
-diff --git a/etc/build/config.props b/etc/build/config.props
-index c6675f1..b8423fe 100644
---- a/etc/build/config.props
-+++ b/etc/build/config.props
-@@ -12,8 +12,8 @@ buildVersion=1.0.62
- //devHome=file:/E:/fan/
- 
- // Windows setup
--jdkHome=/C:/Program Files/Java/jdk1.6.0_21/
--dotnetHome=/C:/WINDOWS/Microsoft.NET/Framework/v2.0.50727/
-+//jdkHome=/C:/Program Files/Java/jdk1.6.0_21/
-+//dotnetHome=/C:/WINDOWS/Microsoft.NET/Framework/v2.0.50727/
- 
- // Mac setup
--//jdkHome=/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home/
-\ No newline at end of file
-+jdkHome=/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home/
+  test do
+    (testpath/"test.fan").write <<-EOS.undent
+      class ATest {
+        static Void main() { echo("a test") }
+      }
+    EOS
+
+    assert_match "a test", shell_output("#{bin}/fan test.fan").chomp
+  end
+end

@@ -2,11 +2,12 @@ require 'formula'
 
 class Grc < Formula
   homepage 'http://korpus.juls.savba.sk/~garabik/software/grc.html'
-  url 'http://korpus.juls.savba.sk/~garabik/software/grc/grc_1.4.tar.gz'
-  sha1 '79fd504d8291f13486d361611415ae60fa56712a'
+  url 'http://korpus.juls.savba.sk/~garabik/software/grc/grc_1.7.orig.tar.gz'
+  sha1 'df9a6a303823500e315d83e1982e4ca1b42d9e77'
+
+  conflicts_with 'cc65', :because => 'both install `grc` binaries'
 
   def install
-    #TODO we should deprefixify since it's python and thus possible
     inreplace ['grc', 'grc.1'], '/etc', etc
     inreplace ['grcat', 'grcat.1'], '/usr/local', prefix
 
@@ -34,6 +35,8 @@ class Grc < Formula
         alias netstat='colourify netstat'
         alias ping='colourify ping'
         alias traceroute='colourify /usr/sbin/traceroute'
+        alias head='colourify head'
+        alias tail='colourify tail'
     fi
     EOS
   end

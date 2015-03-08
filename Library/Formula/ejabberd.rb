@@ -1,44 +1,44 @@
-require 'formula'
-
 class Ejabberd < Formula
-  homepage 'http://www.ejabberd.im'
-  url "http://www.process-one.net/downloads/ejabberd/2.1.11/ejabberd-2.1.11.tgz"
-  sha1 'ae2c521d5e93fbd5bc826052c5524b5222dcfae6'
+  homepage "https://www.ejabberd.im"
+  url "https://www.process-one.net/downloads/ejabberd/15.02/ejabberd-15.02.tgz"
+  sha256 "58cc6b9b512f2f495993be735a8313a8a0591157e0f35a9a3702b59ff9eb6beb"
 
-  depends_on "openssl" if MacOS.version == :leopard
-  depends_on "erlang"
+  head "https://github.com/processone/ejabberd.git"
+
+  bottle do
+    sha256 "4e5ae83ad6edeeea3a67ccdd4f1cd576916f413ea4516a0e66512507c4628667" => :yosemite
+    sha256 "0f073a85e94b5cdcb266a376c27cd146557a75ed376b1900c2c9868eddc20829" => :mavericks
+    sha256 "ee50b942bf62838b2ed5c474e379443da2d1bf352a18c68a5d0c7c96c1719017" => :mountain_lion
+  end
 
   option "32-bit"
-  option 'with-odbc', "Build with ODBC support"
+
+  depends_on "openssl"
+  depends_on "erlang"
+  depends_on "libyaml"
+  # for CAPTCHA challenges
+  depends_on "imagemagick" => :optional
 
   def install
-    ENV['TARGET_DIR'] = ENV['DESTDIR'] = "#{lib}/ejabberd/erlang/lib/ejabberd-#{version}"
-    ENV['MAN_DIR'] = man
-    ENV['SBIN_DIR'] = sbin
+    ENV["TARGET_DIR"] = ENV["DESTDIR"] = "#{lib}/ejabberd/erlang/lib/ejabberd-#{version}"
+    ENV["MAN_DIR"] = man
+    ENV["SBIN_DIR"] = sbin
 
     if build.build_32_bit?
-      %w{ CFLAGS LDFLAGS }.each do |compiler_flag|
-        ENV.remove compiler_flag, "-arch x86_64"
-        ENV.append compiler_flag, "-arch i386"
-      end
+      ENV.append %w[CFLAGS LDFLAGS], "-arch #{Hardware::CPU.arch_32_bit}"
     end
 
-    cd "src" do
-      args = ["--prefix=#{prefix}",
-              "--sysconfdir=#{etc}",
-              "--localstatedir=#{var}"]
+    args = ["--prefix=#{prefix}",
+            "--sysconfdir=#{etc}",
+            "--localstatedir=#{var}",
+            "--enable-pgsql",
+            "--enable-mysql",
+            "--enable-odbc",
+            "--enable-pam"]
 
-      if MacOS.version == :leopard
-        openssl = Formula.factory('openssl')
-        args << "--with-openssl=#{openssl.prefix}"
-      end
-
-      args << "--enable-odbc" if build.include? 'with-odbc'
-
-      system "./configure", *args
-      system "make"
-      system "make install"
-    end
+    system "./configure", *args
+    system "make"
+    system "make", "install"
 
     (etc+"ejabberd").mkpath
     (var+"lib/ejabberd").mkpath
@@ -49,6 +49,27 @@ class Ejabberd < Formula
     If you face nodedown problems, concat your machine name to:
       /private/etc/hosts
     after 'localhost'.
+    EOS
+  end
+
+  plist_options :manual => "#{HOMEBREW_PREFIX}/sbin/ejabberdctl start"
+
+  def plist; <<-EOS.undent
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>Label</key>
+      <string>#{plist_name}</string>
+      <key>ProgramArguments</key>
+      <array>
+        <string>#{opt_sbin}/ejabberdctl</string>
+        <string>start</string>
+      </array>
+      <key>RunAtLoad</key>
+      <true/>
+    </dict>
+    </plist>
     EOS
   end
 end

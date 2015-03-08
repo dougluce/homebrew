@@ -1,54 +1,50 @@
-require 'formula'
-
 class Shiboken < Formula
-  homepage 'http://www.pyside.org/docs/shiboken'
-  url 'http://qt-project.org/uploads/pyside/shiboken-1.1.2.tar.bz2'
-  mirror 'https://distfiles.macports.org/py-shiboken/shiboken-1.1.2.tar.bz2'
-  sha1 '2ffe9d47a3f536840ed9d7eff766a53040bb2a2e'
+  homepage "http://qt-project.org/wiki/PySide"
+  url "https://download.qt.io/official_releases/pyside/shiboken-1.2.2.tar.bz2"
+  mirror "https://distfiles.macports.org/py-shiboken/shiboken-1.2.2.tar.bz2"
+  sha1 "55731616791500750ef373f382057a43e133fa08"
 
-  depends_on 'cmake' => :build
-  depends_on 'qt'
+  head "https://gitorious.org/pyside/shiboken.git"
+
+  bottle do
+    revision 2
+    sha1 "779be49a555b110c4156232528afe6e9cdd5d670" => :yosemite
+    sha1 "e67d83ea94b343541df1b21cd793057fee325780" => :mavericks
+    sha1 "81ea5e997e9910a54cf35e4b5827ab7b502836b3" => :mountain_lion
+  end
+
+  depends_on "cmake" => :build
+  depends_on "qt"
+
+  # don't use depends_on :python because then bottles install Homebrew's python
+  option "without-python", "Build without python 2 support"
+  depends_on :python => :recommended if MacOS.version <= :snow_leopard
+  depends_on :python3 => :optional
 
   def install
-    # Building the tests also runs them. Not building and running tests cuts
-    # install time in half.  As of 1.1.1 the install fails unless you do an
-    # out of tree build and put the source dir last in the args.
-    mkdir 'macbuild' do
-      args = std_cmake_args + %W[
-        -DBUILD_TESTS=OFF
-      ]
-
-
-      python_prefix = `python-config --prefix`.strip
-      # Python is actually a library. The libpythonX.Y.dylib points to this lib, too.
-      if File.exist? "#{python_prefix}/Python"
-        # Python was compiled with --framework:
-        args << "-DPYTHON_LIBRARY='#{python_prefix}/Python'"
-        if !MacOS::CLT.installed? and python_prefix.start_with? '/System/Library'
-          # For Xcode-only systems, the headers of system's python are inside of Xcode
-          args << "-DPYTHON_INCLUDE_DIR='#{MacOS.sdk_path}/System/Library/Frameworks/Python.framework/Versions/2.7/Headers'"
-        else
-          args << "-DPYTHON_INCLUDE_DIR='#{python_prefix}/Headers'"
+    # As of 1.1.1 the install fails unless you do an out of tree build and put
+    # the source dir last in the args.
+    Language::Python.each_python(build) do |python, version|
+      mkdir "macbuild#{version}" do
+        args = std_cmake_args
+        # Building the tests also runs them.
+        args << "-DBUILD_TESTS=ON"
+        if python == "python3" && Formula["python3"].installed?
+          python_framework = (Formula["python3"].opt_prefix)/"Frameworks/Python.framework/Versions/#{version}"
+          args << "-DPYTHON3_INCLUDE_DIR:PATH=#{python_framework}/Headers"
+          args << "-DPYTHON3_LIBRARY:FILEPATH=#{python_framework}/lib/libpython#{version}.dylib"
         end
-      else
-        python_version = `python-config --libs`.match('-lpython(\d+\.\d+)').captures.at(0)
-        python_lib = "#{python_prefix}/lib/libpython#{python_version}"
-        if File.exists? "#{python_lib}.a"
-          args << "-DPYTHON_LIBRARY='#{python_lib}.a'"
-        else
-          args << "-DPYTHON_LIBRARY='#{python_lib}.dylib'"
-        end
-        args << "-DPYTHON_INCLUDE_DIR='#{python_prefix}/include/#{which_python}'"
+        args << "-DUSE_PYTHON3:BOOL=ON" if python == "python3"
+        args << ".."
+        system "cmake", *args
+        system "make", "install"
       end
-
-
-      args << '..'
-      system 'cmake', *args
-      system "make install"
     end
   end
 
-  def which_python
-    "python" + `python -c 'import sys;print(sys.version[:3])'`.strip
+  test do
+    Language::Python.each_python(build) do |python, version|
+      system python, "-c", "import shiboken"
+    end
   end
 end

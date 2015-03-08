@@ -2,22 +2,27 @@ require 'formula'
 
 class GribApi < Formula
   homepage 'https://software.ecmwf.int/wiki/display/GRIB/Home'
-  url 'https://software.ecmwf.int/wiki/download/attachments/3473437/grib_api-1.9.18.tar.gz'
-  sha1 '87616917a6978a56ae4fe173a3e6e3828b0ebfba'
+  url 'https://software.ecmwf.int/wiki/download/attachments/3473437/grib_api-1.12.3.tar.gz'
+  sha1 '2764b262c8f081fefb81112f7f7463a3a34b6e66'
+  revision 1
 
+  bottle do
+    sha1 "08dc51f4cdba79970fe8637fec16cfe47a9bb471" => :yosemite
+    sha1 "07779d6c8cc95a7dee2479b43c6f148f91f92b10" => :mavericks
+    sha1 "4b023028c85935df0891c6fdec3249ac439454ab" => :mountain_lion
+  end
+
+  depends_on :fortran
   depends_on 'jasper' => :recommended
   depends_on 'openjpeg' => :optional
 
   # Fixes build errors in Lion
   # https://software.ecmwf.int/wiki/plugins/viewsource/viewpagesrc.action?pageId=12648475
-  def patches
-    DATA
-  end
+  patch :DATA
 
   def install
     ENV.deparallelize
     ENV.no_optimization
-    ENV.fortran
 
     system "./configure", "--prefix=#{prefix}"
     system "make"

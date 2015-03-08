@@ -1,41 +1,67 @@
-require 'formula'
-
 class FreeradiusServer < Formula
-  homepage 'http://freeradius.org/'
-  url 'ftp://ftp.freeradius.org/pub/freeradius/freeradius-server-2.2.0.tar.gz'
-  sha1 '1bf089dcd19f365d0ad1166e2062ef5336d892b4'
+  homepage "http://freeradius.org/"
+  revision 2
 
-  # Requires newer autotools on all platforms
-  depends_on 'autoconf' => :build
-  depends_on 'automake' => :build
-  depends_on 'libtool' => :build
+  stable do
+    url "ftp://ftp.freeradius.org/pub/freeradius/freeradius-server-2.2.6.tar.gz"
+    sha1 "25b0a057b1fffad5a030946e8af0c6170e5cdf46"
 
-  # libtool is glibtool on OS X
-  def patches; DATA end
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+  end
+
+  devel do
+    url "ftp://ftp.freeradius.org/pub/freeradius/freeradius-server-3.0.6.tar.bz2"
+    sha1 "37c5a38f74a8b228abe9682db9f3184a9c7d9639"
+    depends_on "talloc" => :build
+  end
+
+  bottle do
+    sha1 "a46ed359e5124ea50fe3331d150a7ad82011e1b5" => :yosemite
+    sha1 "e9ddff066dd51b5cbc207787a3f5d3053e8ce088" => :mavericks
+    sha1 "9406f32f9e73f44383b0cdc8410ea79b5504c95f" => :mountain_lion
+  end
+
+  depends_on "openssl"
 
   def install
     ENV.deparallelize
 
-    system "autoreconf", "-fvi"
-    system "./configure", "--prefix=#{prefix}",
-                          "--with-system-libtool",
-                          "--with-system-libltdl"
+    args = %W[
+      --prefix=#{prefix}
+      --sbindir=#{bin}
+      --localstatedir=#{var}
+      --with-openssl-includes=#{Formula["openssl"].opt_include}
+      --with-openssl-libraries=#{Formula["openssl"].opt_lib}
+    ]
+
+    if build.stable?
+      # libtool is glibtool on OS X
+      inreplace "configure.in", "libtool,,", "glibtool,,"
+      inreplace "autogen.sh", "libtool", "glibtool"
+
+      args << "--with-system-libtool"
+      args << "--with-system-libltdl"
+      system "./autogen.sh"
+    end
+
+    if build.devel?
+      args << "--with-talloc-lib-dir=#{Formula["talloc"].opt_lib}"
+      args << "--with-talloc-include-dir=#{Formula["talloc"].opt_include}"
+    end
+
+    system "./configure", *args
     system "make"
-    system "make install"
+    system "make", "install"
+  end
+
+  def post_install
+    (var/"run/radiusd").mkpath
+    (var/"log/radius").mkpath
+  end
+
+  test do
+    assert_match /77C8009C912CFFCF3832C92FC614B7D1/, shell_output("#{bin}/smbencrypt homebrew")
   end
 end
-
-__END__
-diff --git a/configure.in b/configure.in
-index 62b0de8..97e0243 100644
---- a/configure.in
-+++ b/configure.in
-@@ -101,7 +101,7 @@ AC_SUBST(LTDL_SUBDIRS)
- dnl use system-wide libtool, if it exists
- AC_ARG_WITH(system-libtool,
- [  --with-system-libtool   Use the libtool installed in your system (default=use our own)],
--[ AC_PATH_PROG(LIBTOOL, libtool,,$PATH:/usr/local/bin) AC_LIBTOOL_DLOPEN
-+[ AC_PATH_PROG(LIBTOOL, glibtool,,$PATH:/usr/local/bin) AC_LIBTOOL_DLOPEN
-  AC_PROG_LIBTOOL],
- [
-   LIBTOOL="`pwd`/libtool"
